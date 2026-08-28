@@ -74,11 +74,11 @@ class MovePromptDialog(QDialog):
         grid.setSpacing(8)
 
         c = self._conflict
-        headers = ["", "Vorhanden (Sammelordner)", "Neu (Mod-Ordner)"]
+        headers = ["", "Neu (Mod-Ordner)", "Vorhanden (Sammelordner)"]
         rows = [
-            ("Version", c.target_version or "unbekannt", c.source_version or "unbekannt"),
-            ("Größe", f"{c.target_size:,} Bytes", f"{c.source_size:,} Bytes"),
-            ("Geändert", c.target_modified.strftime(_DATE_FMT), c.source_modified.strftime(_DATE_FMT)),
+            ("Version", c.source_version or "unbekannt", c.target_version or "unbekannt"),
+            ("Größe", f"{c.source_size:,} Bytes", f"{c.target_size:,} Bytes"),
+            ("Geändert", c.source_modified.strftime(_DATE_FMT), c.target_modified.strftime(_DATE_FMT)),
         ]
 
         for col, text in enumerate(headers):
@@ -86,10 +86,10 @@ class MovePromptDialog(QDialog):
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             grid.addWidget(lbl, 0, col)
 
-        for row_idx, (label, target_val, source_val) in enumerate(rows, start=1):
+        for row_idx, (label, source_val, target_val) in enumerate(rows, start=1):
             grid.addWidget(QLabel(label), row_idx, 0)
-            grid.addWidget(QLabel(target_val), row_idx, 1, Qt.AlignmentFlag.AlignCenter)
-            grid.addWidget(QLabel(source_val), row_idx, 2, Qt.AlignmentFlag.AlignCenter)
+            grid.addWidget(QLabel(source_val), row_idx, 1, Qt.AlignmentFlag.AlignCenter)
+            grid.addWidget(QLabel(target_val), row_idx, 2, Qt.AlignmentFlag.AlignCenter)
 
         return frame
 
