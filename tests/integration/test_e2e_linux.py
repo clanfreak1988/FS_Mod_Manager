@@ -53,8 +53,8 @@ _MOD_DESC = """\
 _SAVEGAME_XML = """\
 <?xml version="1.0" encoding="utf-8"?>
 <careerSavegame>
-  <mod modName="FS22_ModA" title="Mod A" version="1.0.0.0" required="false" fileHash="abc"/>
-  <mod modName="FS22_ModB" title="Mod B" version="1.0.0.0" required="false" fileHash="def"/>
+  <mod modName="FS25_ModA" title="Mod A" version="1.0.0.0" required="false" fileHash="abc"/>
+  <mod modName="FS25_ModB" title="Mod B" version="1.0.0.0" required="false" fileHash="def"/>
   <mod modName="pdlc_SomeContent" title="PDLC" version="1.0" required="true" fileHash="xyz"/>
 </careerSavegame>"""
 
@@ -125,9 +125,9 @@ def _make_vm(tmp: Path) -> MainViewModel:
 def fs(tmp_path):
     """Simulated FS structure with three mod ZIPs in the source folder."""
     source, collection, savegames, configs = _make_fs_structure(tmp_path)
-    _make_mod_zip(source, "FS22_ModA.zip", "Mod A")
-    _make_mod_zip(source, "FS22_ModB.zip", "Mod B")
-    _make_mod_zip(source, "FS22_ModC.zip", "Mod C")
+    _make_mod_zip(source, "FS25_ModA.zip", "Mod A")
+    _make_mod_zip(source, "FS25_ModB.zip", "Mod B")
+    _make_mod_zip(source, "FS25_ModC.zip", "Mod C")
     sg_dir = savegames / "savegame1"
     sg_dir.mkdir()
     (sg_dir / "careerSavegame.xml").write_text(_SAVEGAME_XML, encoding="utf-8")
@@ -182,9 +182,9 @@ class TestCollectOnInit:
         import os
         source = fs / "mods"
         collection = fs / "collection"
-        target = collection / "FS22_AlreadyActive.zip"
-        _make_mod_zip(collection, "FS22_AlreadyActive.zip", "Already Active")
-        os.symlink(target, source / "FS22_AlreadyActive.zip")
+        target = collection / "FS25_AlreadyActive.zip"
+        _make_mod_zip(collection, "FS25_AlreadyActive.zip", "Already Active")
+        os.symlink(target, source / "FS25_AlreadyActive.zip")
 
         vm = _make_vm(fs)
         detected = []
@@ -193,8 +193,8 @@ class TestCollectOnInit:
 
         assert detected, "Expected the 3 fixture mods to be reported as new"
         reported = set(detected[0])
-        assert "FS22_AlreadyActive.zip" not in reported
-        assert reported == {"FS22_ModA.zip", "FS22_ModB.zip", "FS22_ModC.zip"}
+        assert "FS25_AlreadyActive.zip" not in reported
+        assert reported == {"FS25_ModA.zip", "FS25_ModB.zip", "FS25_ModC.zip"}
 
     def test_invalid_filename_triggers_warning_on_collect(self, fs, qtbot) -> None:
         """A newly dropped mod whose filename FS itself would reject (e.g. a
@@ -326,12 +326,12 @@ class TestRenameMod:
 class TestDeleteMod:
     def test_removes_from_collection_and_lists(self, vm, fs) -> None:
         vm.initialize()
-        mod = next(m for m in vm.available_mods if m.filename == "FS22_ModA.zip")
+        mod = next(m for m in vm.available_mods if m.filename == "FS25_ModA.zip")
 
         vm.delete_mod(mod)
 
-        assert not (fs / "collection" / "FS22_ModA.zip").exists()
-        assert not any(m.filename == "FS22_ModA.zip" for m in vm.available_mods)
+        assert not (fs / "collection" / "FS25_ModA.zip").exists()
+        assert not any(m.filename == "FS25_ModA.zip" for m in vm.available_mods)
 
     def test_removes_active_symlink(self, vm, fs) -> None:
         vm.initialize()
@@ -340,10 +340,10 @@ class TestDeleteMod:
         vm.move_all_to_selected()
         vm.activate_config()
 
-        mod = next(m for m in vm.selected_mods if m.filename == "FS22_ModA.zip")
+        mod = next(m for m in vm.selected_mods if m.filename == "FS25_ModA.zip")
         vm.delete_mod(mod)
 
-        assert not (fs / "mods" / "FS22_ModA.zip").exists()
+        assert not (fs / "mods" / "FS25_ModA.zip").exists()
 
     def test_removes_from_saved_config_reference(self, vm, fs) -> None:
         vm.initialize()
@@ -352,20 +352,20 @@ class TestDeleteMod:
         vm.move_all_to_selected()
         vm.save_config()
 
-        mod = next(m for m in vm.selected_mods if m.filename == "FS22_ModA.zip")
+        mod = next(m for m in vm.selected_mods if m.filename == "FS25_ModA.zip")
         vm.delete_mod(mod)
 
         stored = vm._config_svc.load("Hof1")
-        assert "FS22_ModA.zip" not in stored.mod_filenames
+        assert "FS25_ModA.zip" not in stored.mod_filenames
 
     def test_leaves_other_mods_untouched(self, vm, fs) -> None:
         vm.initialize()
-        mod = next(m for m in vm.available_mods if m.filename == "FS22_ModA.zip")
+        mod = next(m for m in vm.available_mods if m.filename == "FS25_ModA.zip")
 
         vm.delete_mod(mod)
 
-        assert any(m.filename == "FS22_ModB.zip" for m in vm.available_mods)
-        assert (fs / "collection" / "FS22_ModB.zip").exists()
+        assert any(m.filename == "FS25_ModB.zip" for m in vm.available_mods)
+        assert (fs / "collection" / "FS25_ModB.zip").exists()
 
 
 # ── 2. Config lifecycle ───────────────────────────────────────────────────────
@@ -419,11 +419,11 @@ class TestConfigLifecycle:
         vm.initialize()
         vm.create_config("Partial")
         vm.select_config("Partial")
-        mods_a = [m for m in vm.available_mods if m.filename == "FS22_ModA.zip"]
+        mods_a = [m for m in vm.available_mods if m.filename == "FS25_ModA.zip"]
         vm.move_to_selected(mods_a)
         vm.save_config()
         config = vm._config_svc.load("Partial")
-        assert config.mod_filenames == ["FS22_ModA.zip"]
+        assert config.mod_filenames == ["FS25_ModA.zip"]
 
 
 # ── 3. Activate (symlink management) ─────────────────────────────────────────
@@ -438,7 +438,7 @@ class TestActivate:
         vm.activate_config()
         src = fs / "mods"
         links = {p.name for p in src.iterdir() if p.is_symlink()}
-        assert "FS22_ModA.zip" in links
+        assert "FS25_ModA.zip" in links
 
     def test_activate_removes_previous_links(self, vm, fs) -> None:
         vm.initialize()
@@ -456,7 +456,7 @@ class TestActivate:
 
         src = fs / "mods"
         links = {p.name for p in src.iterdir() if p.is_symlink()}
-        assert links == {"FS22_ModA.zip"}
+        assert links == {"FS25_ModA.zip"}
 
     def test_activate_stores_active_modpack_in_settings(self, vm, fs) -> None:
         vm.initialize()
@@ -496,7 +496,7 @@ class TestActivate:
         assert saved.active_modpack == "Hof1"
         # ...and the symlinks from the earlier activate_config() are untouched.
         links = {p.name for p in (fs / "mods").iterdir() if p.is_symlink()}
-        assert links == {"FS22_ModA.zip", "FS22_ModB.zip", "FS22_ModC.zip"}
+        assert links == {"FS25_ModA.zip", "FS25_ModB.zip", "FS25_ModC.zip"}
 
 
 # ── 4. Savegame import ────────────────────────────────────────────────────────
@@ -514,8 +514,8 @@ class TestSavegameImport:
         vm.import_savegame(xml)
         config = vm._config_svc.load("savegame1")
         filenames = set(config.mod_filenames)
-        assert "FS22_ModA.zip" in filenames
-        assert "FS22_ModB.zip" in filenames
+        assert "FS25_ModA.zip" in filenames
+        assert "FS25_ModB.zip" in filenames
 
     def test_import_pdlc_filtered_out(self, vm, fs) -> None:
         vm.initialize()
@@ -530,8 +530,8 @@ class TestSavegameImport:
         vm.import_savegame(xml)
         # ModA and ModB exist in collection → should be in selected_mods
         selected = {m.filename for m in vm.selected_mods}
-        assert "FS22_ModA.zip" in selected
-        assert "FS22_ModB.zip" in selected
+        assert "FS25_ModA.zip" in selected
+        assert "FS25_ModB.zip" in selected
 
     def test_import_unknown_mods_not_in_selected(self, vm, fs) -> None:
         """Mods referenced in savegame but absent from collection stay absent."""
@@ -540,7 +540,7 @@ class TestSavegameImport:
         vm.import_savegame(xml)
         selected = {m.filename for m in vm.selected_mods}
         # ModC is in the collection but NOT in the savegame XML
-        assert "FS22_ModC.zip" not in selected
+        assert "FS25_ModC.zip" not in selected
 
 
 # ── 5. Settings persistence ───────────────────────────────────────────────────
@@ -710,7 +710,7 @@ class TestGuiEndToEnd:
 
         # Put ZIPs in collection directly so collect() is a no-op during init.
         col = fs / "collection"
-        _make_mod_zip(col, "FS22_LinkTest.zip", "Link Test")
+        _make_mod_zip(col, "FS25_LinkTest.zip", "Link Test")
 
         vm = _make_vm(fs)
         window = MainWindow(view_model=vm)
@@ -751,7 +751,7 @@ class TestGuiEndToEnd:
         qtbot.addWidget(window)
         _show_and_init(window, vm, qtbot)
 
-        expected = {"FS22_ModA.zip", "FS22_ModB.zip", "FS22_ModC.zip"}
+        expected = {"FS25_ModA.zip", "FS25_ModB.zip", "FS25_ModC.zip"}
         assert window._available_list.list_model._highlighted == expected
 
         window._btn_move_all_right.click()
@@ -869,7 +869,7 @@ class TestGuiEndToEnd:
         _show_and_init(window, vm, qtbot)
 
         mod = next(m for m in window._available_list.list_model.mods()
-                   if m.filename == "FS22_ModA.zip")
+                   if m.filename == "FS25_ModA.zip")
 
         monkeypatch.setattr(
             "fsmodmanager.gui.main_window.QMessageBox.question",
@@ -878,8 +878,8 @@ class TestGuiEndToEnd:
         window._on_delete_mod(mod)
 
         filenames = {m.filename for m in window._available_list.list_model.mods()}
-        assert "FS22_ModA.zip" not in filenames
-        assert not (fs / "collection" / "FS22_ModA.zip").exists()
+        assert "FS25_ModA.zip" not in filenames
+        assert not (fs / "collection" / "FS25_ModA.zip").exists()
 
     def test_delete_mod_cancelled_leaves_file_untouched(self, fs, qtbot, monkeypatch) -> None:
         from fsmodmanager.gui.main_window import MainWindow
@@ -890,7 +890,7 @@ class TestGuiEndToEnd:
         _show_and_init(window, vm, qtbot)
 
         mod = next(m for m in window._available_list.list_model.mods()
-                   if m.filename == "FS22_ModA.zip")
+                   if m.filename == "FS25_ModA.zip")
 
         monkeypatch.setattr(
             "fsmodmanager.gui.main_window.QMessageBox.question",
@@ -899,5 +899,5 @@ class TestGuiEndToEnd:
         window._on_delete_mod(mod)
 
         filenames = {m.filename for m in window._available_list.list_model.mods()}
-        assert "FS22_ModA.zip" in filenames
-        assert (fs / "collection" / "FS22_ModA.zip").exists()
+        assert "FS25_ModA.zip" in filenames
+        assert (fs / "collection" / "FS25_ModA.zip").exists()

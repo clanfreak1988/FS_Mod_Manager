@@ -37,7 +37,7 @@ def mod_en_dds(tmp_path_factory) -> Path:
     </title>
     <iconFilename>icon.dds</iconFilename>
 </modDesc>"""
-    return _write_zip("FS22_ModEnDds.zip", xml, {"icon.dds": b"\x00" * 16})
+    return _write_zip("FS25_ModEnDds.zip", xml, {"icon.dds": b"\x00" * 16})
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ def mod_png_icon(tmp_path_factory) -> Path:
     </title>
     <iconFilename>store/icon.png</iconFilename>
 </modDesc>"""
-    return _write_zip("FS22_ModPngIcon.zip", xml, {"store/icon.png": b"\x89PNG\r\n"})
+    return _write_zip("FS25_ModPngIcon.zip", xml, {"store/icon.png": b"\x89PNG\r\n"})
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ def mod_de_only(tmp_path_factory) -> Path:
     </title>
     <iconFilename>icon.dds</iconFilename>
 </modDesc>"""
-    return _write_zip("FS22_ModDeOnly.zip", xml)
+    return _write_zip("FS25_ModDeOnly.zip", xml)
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ def mod_map(tmp_path_factory) -> Path:
         </map>
     </maps>
 </modDesc>"""
-    return _write_zip("FS22_ModMap.zip", xml, {"icon.dds": b"\x00" * 16})
+    return _write_zip("FS25_ModMap.zip", xml, {"icon.dds": b"\x00" * 16})
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ def mod_map(tmp_path_factory) -> Path:
 @pytest.fixture(scope="session")
 def mod_no_moddesc(tmp_path_factory) -> Path:
     FIXTURES_DIR.mkdir(exist_ok=True)
-    path = FIXTURES_DIR / "FS22_NoModDesc.zip"
+    path = FIXTURES_DIR / "FS25_NoModDesc.zip"
     with zipfile.ZipFile(path, "w") as zf:
         zf.writestr("readme.txt", b"no moddesc here")
     return path
@@ -120,6 +120,6 @@ def mod_no_moddesc(tmp_path_factory) -> Path:
 @pytest.fixture(scope="session")
 def mod_corrupt_zip(tmp_path_factory) -> Path:
     FIXTURES_DIR.mkdir(exist_ok=True)
-    path = FIXTURES_DIR / "FS22_Corrupt.zip"
+    path = FIXTURES_DIR / "FS25_Corrupt.zip"
     path.write_bytes(b"this is not a zip file at all")
     return path

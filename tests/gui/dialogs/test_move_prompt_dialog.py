@@ -10,12 +10,12 @@ from fsmodmanager.gui.dialogs.move_prompt_dialog import MovePromptDialog
 
 def _conflict(source_version: str = "1.2.0.0", target_version: str = "1.1.0.0") -> MoveConflict:
     return MoveConflict(
-        filename="FS22_Test.zip",
-        source_path=Path("/src/FS22_Test.zip"),
+        filename="FS25_Test.zip",
+        source_path=Path("/src/FS25_Test.zip"),
         source_size=1024,
         source_modified=datetime(2024, 3, 15, 10, 30),
         source_version=source_version,
-        target_path=Path("/col/FS22_Test.zip"),
+        target_path=Path("/col/FS25_Test.zip"),
         target_size=2048,
         target_modified=datetime(2024, 1, 5, 8, 0),
         target_version=target_version,
@@ -71,7 +71,7 @@ class TestMovePromptDialog:
         # The headline label contains the filename
         found = False
         for child in dialog.findChildren(__import__("PySide6.QtWidgets", fromlist=["QLabel"]).QLabel):
-            if "FS22_Test.zip" in child.text():
+            if "FS25_Test.zip" in child.text():
                 found = True
                 break
         assert found, "Filename not found in any label"

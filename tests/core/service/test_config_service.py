@@ -17,7 +17,7 @@ def svc(tmp_path: Path) -> ConfigService:
 
 @pytest.fixture
 def saved_config(svc: ConfigService) -> Configuration:
-    config = Configuration(name="MeinHof", mod_filenames=["FS22_B.zip", "FS22_A.zip"])
+    config = Configuration(name="MeinHof", mod_filenames=["FS25_B.zip", "FS25_A.zip"])
     svc.save(config)
     return config
 
@@ -32,13 +32,13 @@ class TestSaveAndLoad:
         assert loaded == saved_config
 
     def test_load_filenames_sorted(self, svc: ConfigService) -> None:
-        svc.save(Configuration(name="X", mod_filenames=["FS22_Z.zip", "FS22_A.zip"]))
-        assert svc.load("X").mod_filenames == ["FS22_A.zip", "FS22_Z.zip"]
+        svc.save(Configuration(name="X", mod_filenames=["FS25_Z.zip", "FS25_A.zip"]))
+        assert svc.load("X").mod_filenames == ["FS25_A.zip", "FS25_Z.zip"]
 
     def test_save_overwrites(self, svc: ConfigService, saved_config: Configuration) -> None:
-        updated = Configuration(name="MeinHof", mod_filenames=["FS22_New.zip"])
+        updated = Configuration(name="MeinHof", mod_filenames=["FS25_New.zip"])
         svc.save(updated)
-        assert svc.load("MeinHof").mod_filenames == ["FS22_New.zip"]
+        assert svc.load("MeinHof").mod_filenames == ["FS25_New.zip"]
 
     def test_save_creates_parent_dir(self, tmp_path: Path) -> None:
         svc = ConfigService(configs_dir=tmp_path / "a" / "b" / "configs")
@@ -51,11 +51,11 @@ class TestSaveAndLoad:
         configs_dir = tmp_path / "configs"
         configs_dir.mkdir()
         (configs_dir / "JavaConfig.json").write_text(
-            json.dumps(["FS22_ModA.zip", "FS22_ModB.zip"]), encoding="utf-8"
+            json.dumps(["FS25_ModA.zip", "FS25_ModB.zip"]), encoding="utf-8"
         )
         config = svc.load("JavaConfig")
         assert config.name == "JavaConfig"
-        assert "FS22_ModA.zip" in config.mod_filenames
+        assert "FS25_ModA.zip" in config.mod_filenames
 
 
 class TestLoadAll:

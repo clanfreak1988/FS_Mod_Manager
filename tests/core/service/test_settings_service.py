@@ -66,9 +66,9 @@ class TestDefaultPaths:
         """When FS path does not exist and no callback is given, still get a Settings object."""
         settings = svc.load(ask_for_path=None)
         assert isinstance(settings, Settings)
-        assert "FarmingSimulator2022" in settings.source_mod_folder
-        assert "FarmingSimulator2022" in settings.mod_collection_folder
-        assert "FarmingSimulator2022" in settings.savegame_path
+        assert "FarmingSimulator2025" in settings.source_mod_folder
+        assert "FarmingSimulator2025" in settings.mod_collection_folder
+        assert "FarmingSimulator2025" in settings.savegame_path
 
     def test_source_mod_folder_is_mods_subdir(self, svc: SettingsService) -> None:
         settings = svc.load()
@@ -113,9 +113,9 @@ class TestDefaultPaths:
         svc = SettingsService(data_dir=tmp_path / "data")
         callback_called = []
 
-        # The default path ~/ Documents/My Games/FarmingSimulator2022 almost
+        # The default path ~/ Documents/My Games/FarmingSimulator2025 almost
         # certainly does not exist on the CI/dev machine, so the callback WILL be
-        # called here – unless the dev has FS22 installed.  We just assert the
+        # called here – unless the dev has FS25 installed.  We just assert the
         # returned Settings is well-formed.
         settings = svc.load(ask_for_path=lambda: str(tmp_path))
         assert isinstance(settings, Settings)
@@ -219,10 +219,10 @@ class TestWindowsDocumentsDir:
     def test_find_game_home_prefers_registry_result(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """When the registry resolves a Documents dir whose FS22 subfolder
+        """When the registry resolves a Documents dir whose FS25 subfolder
         exists, that path must win over the plain ~/Documents default."""
         redirected_docs = tmp_path / "Redirected" / "Documents"
-        game_home = redirected_docs / "My Games" / "FarmingSimulator2022"
+        game_home = redirected_docs / "My Games" / "FarmingSimulator2025"
         game_home.mkdir(parents=True)
 
         monkeypatch.setattr(

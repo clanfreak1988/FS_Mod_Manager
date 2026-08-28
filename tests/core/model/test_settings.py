@@ -8,9 +8,9 @@ from fsmodmanager.core.model.settings import Settings
 @pytest.fixture
 def sample_settings() -> Settings:
     return Settings(
-        source_mod_folder="/home/user/Documents/My Games/FarmingSimulator2022/mods",
-        mod_collection_folder="/home/user/Documents/My Games/FarmingSimulator2022/LS_mods",
-        savegame_path="/home/user/Documents/My Games/FarmingSimulator2022",
+        source_mod_folder="/home/user/Documents/My Games/FarmingSimulator2025/mods",
+        mod_collection_folder="/home/user/Documents/My Games/FarmingSimulator2025/LS_mods",
+        savegame_path="/home/user/Documents/My Games/FarmingSimulator2025",
     )
 
 

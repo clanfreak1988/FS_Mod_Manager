@@ -182,12 +182,12 @@ class TestModListWidget:
         widget = ModListWidget()
         qtbot.addWidget(widget)
         widget.set_mods([
-            _mod("FS22_Alpha.zip", title="Alpha Mod", author="Dev"),
-            _mod("FS22_Beta.zip",  title="Beta Mod",  author="Dev"),
+            _mod("FS25_Alpha.zip", title="Alpha Mod", author="Dev"),
+            _mod("FS25_Beta.zip",  title="Beta Mod",  author="Dev"),
         ])
         widget.set_filter("alpha")
         assert widget.list_model.rowCount() == 1
-        assert widget.list_model.mods()[0].filename == "FS22_Alpha.zip"
+        assert widget.list_model.mods()[0].filename == "FS25_Alpha.zip"
 
     def test_filter_matches_title(self, qtbot) -> None:
         widget = ModListWidget()
@@ -212,7 +212,7 @@ class TestModListWidget:
     def test_filter_is_case_insensitive(self, qtbot) -> None:
         widget = ModListWidget()
         qtbot.addWidget(widget)
-        widget.set_mods([_mod("FS22_BigMod.zip", title="Big Mod", author="Dev")])
+        widget.set_mods([_mod("FS25_BigMod.zip", title="Big Mod", author="Dev")])
         widget.set_filter("BIG")
         assert widget.list_model.rowCount() == 1
 
@@ -233,22 +233,22 @@ class TestModListWidget:
         """When the mod list is replaced, an active filter is preserved."""
         widget = ModListWidget()
         qtbot.addWidget(widget)
-        widget.set_mods([_mod("FS22_Krone.zip", title="Krone", author="Dev"),
-                         _mod("FS22_Claas.zip", title="Claas", author="Dev")])
+        widget.set_mods([_mod("FS25_Krone.zip", title="Krone", author="Dev"),
+                         _mod("FS25_Claas.zip", title="Claas", author="Dev")])
         widget.set_filter("krone")
         # Replace the list – filter must still apply to the new list
-        widget.set_mods([_mod("FS22_Krone.zip",  title="Krone",  author="Dev"),
-                         _mod("FS22_Fendt.zip",  title="Fendt",  author="Dev"),
-                         _mod("FS22_Deutz.zip",  title="Deutz",  author="Dev")])
+        widget.set_mods([_mod("FS25_Krone.zip",  title="Krone",  author="Dev"),
+                         _mod("FS25_Fendt.zip",  title="Fendt",  author="Dev"),
+                         _mod("FS25_Deutz.zip",  title="Deutz",  author="Dev")])
         assert widget.list_model.rowCount() == 1
-        assert widget.list_model.mods()[0].filename == "FS22_Krone.zip"
+        assert widget.list_model.mods()[0].filename == "FS25_Krone.zip"
 
     def test_icon_loaded_from_zip(self, qtbot, tmp_path) -> None:
-        _make_zip(tmp_path, "FS22_Test.zip", "Test Mod")
+        _make_zip(tmp_path, "FS25_Test.zip", "Test Mod")
         widget = ModListWidget()
         qtbot.addWidget(widget)
         widget.set_collection_dir(tmp_path)
-        widget.set_mods([_mod("FS22_Test.zip")])
+        widget.set_mods([_mod("FS25_Test.zip")])
         # Trigger icon load via DecorationRole
         from PySide6.QtCore import Qt
         idx = widget.list_model.index(0)

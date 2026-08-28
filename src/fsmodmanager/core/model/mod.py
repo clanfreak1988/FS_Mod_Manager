@@ -39,7 +39,7 @@ class Mod:
     and replaces the JavaFX ImageView.
     """
 
-    filename: str       # ZIP filename, e.g. "FS22_SomeMod.zip"
+    filename: str       # ZIP filename, e.g. "FS25_SomeMod.zip"
     title: str          # modDesc.xml → title
     author: str         # modDesc.xml → author
     version: str        # modDesc.xml → version

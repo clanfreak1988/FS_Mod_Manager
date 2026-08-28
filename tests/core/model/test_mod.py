@@ -9,7 +9,7 @@ from fsmodmanager.core.model.mod import Mod, is_valid_mod_name, sanitize_mod_nam
 @pytest.fixture
 def sample_mod() -> Mod:
     return Mod(
-        filename="FS22_SomeMod.zip",
+        filename="FS25_SomeMod.zip",
         title="Some Mod",
         author="Max Mustermann",
         version="1.0.0.0",
@@ -21,7 +21,7 @@ class TestModSerialization:
     def test_to_dict_contains_all_fields(self, sample_mod: Mod) -> None:
         d = sample_mod.to_dict()
         assert d == {
-            "filename": "FS22_SomeMod.zip",
+            "filename": "FS25_SomeMod.zip",
             "title": "Some Mod",
             "author": "Max Mustermann",
             "version": "1.0.0.0",
@@ -72,7 +72,7 @@ class TestModSerialization:
 class TestValidModName:
     @pytest.mark.parametrize("filename", [
         "FS25_AdvancedDamageSystem.zip",
-        "FS22_Mod_123.zip",
+        "FS25_Mod_123.zip",
         "_startsWithUnderscore.zip",
         "a.zip",
     ])

@@ -9,7 +9,7 @@ from fsmodmanager.core.model.configuration import Configuration
 def sample_config() -> Configuration:
     return Configuration(
         name="Mein Hof",
-        mod_filenames=["FS22_ZMod.zip", "FS22_AMod.zip", "FS22_MMod.zip"],
+        mod_filenames=["FS25_ZMod.zip", "FS25_AMod.zip", "FS25_MMod.zip"],
     )
 
 
@@ -34,10 +34,10 @@ class TestConfigurationSerialization:
     def test_mod_filenames_sorted_case_insensitive(self) -> None:
         config = Configuration(
             name="Test",
-            mod_filenames=["FS22_ZMod.zip", "FS22_aMod.zip", "FS22_MMod.zip"],
+            mod_filenames=["FS25_ZMod.zip", "FS25_aMod.zip", "FS25_MMod.zip"],
         )
         assert config.mod_filenames == sorted(
-            ["FS22_ZMod.zip", "FS22_aMod.zip", "FS22_MMod.zip"], key=str.casefold
+            ["FS25_ZMod.zip", "FS25_aMod.zip", "FS25_MMod.zip"], key=str.casefold
         )
 
     def test_empty_mod_filenames(self) -> None:

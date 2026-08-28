@@ -9,7 +9,7 @@ from fsmodmanager.core.model.settings import Settings
 _SETTINGS_FILE = "settings.json"
 
 # Relative to the user's Documents folder – matches the Java default paths.
-_FS22_SUBPATH = Path("My Games") / "FarmingSimulator2022"
+_FS_SUBPATH = Path("My Games") / "FarmingSimulator2025"
 
 
 def _windows_documents_dir() -> Path | None:
@@ -54,9 +54,9 @@ class SettingsService:
     (Linux: ~/.local/share/FSModManager/, Windows: %APPDATA%/FSModManager/).
 
     Default paths mirror Java ModManagerConfig:
-      source_mod_folder      = <Documents>/My Games/FarmingSimulator2022/mods
-      mod_collection_folder  = <Documents>/My Games/FarmingSimulator2022/LS_mods
-      savegame_path          = <Documents>/My Games/FarmingSimulator2022
+      source_mod_folder      = <Documents>/My Games/FarmingSimulator2025/mods
+      mod_collection_folder  = <Documents>/My Games/FarmingSimulator2025/LS_mods
+      savegame_path          = <Documents>/My Games/FarmingSimulator2025
 
     If the default game directory does not exist on first run, the optional
     `ask_for_path` callback is invoked so the GUI can prompt the user.
@@ -113,17 +113,17 @@ class SettingsService:
 
     @staticmethod
     def _find_game_home(ask_for_path: Callable[[], str] | None) -> Path:
-        """Return the FS22 game-home directory.
+        """Return the FS25 game-home directory.
 
         Resolves the real Documents folder first (via the Windows registry
         on Windows, to correctly handle a redirected/OneDrive Documents
         folder; falls back to ``~/Documents`` everywhere else or if that
         lookup fails), then checks the standard
-        ``<Documents>/My Games/FarmingSimulator2022`` location.  Falls back
+        ``<Documents>/My Games/FarmingSimulator2025`` location.  Falls back
         to the `ask_for_path` callback if that directory does not exist.
         """
         documents_dir = _windows_documents_dir() or (Path.home() / "Documents")
-        default = documents_dir / _FS22_SUBPATH
+        default = documents_dir / _FS_SUBPATH
         if default.exists():
             return default
         if ask_for_path is not None:

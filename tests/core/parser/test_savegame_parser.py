@@ -14,9 +14,9 @@ _SAVEGAME_XML = """\
     <settings>
         <savegameName>Mein Hof</savegameName>
     </settings>
-    <mod modName="FS22_ModA" title="Mod A" version="1.0.0.0" required="false" fileHash="aaa" />
-    <mod modName="FS22_ModB" title="Mod B" version="2.0.0.0" required="true"  fileHash="bbb" />
-    <mod modName="FS22_modC" title="Mod C" version="3.0.0.0" required="false" fileHash="ccc" />
+    <mod modName="FS25_ModA" title="Mod A" version="1.0.0.0" required="false" fileHash="aaa" />
+    <mod modName="FS25_ModB" title="Mod B" version="2.0.0.0" required="true"  fileHash="bbb" />
+    <mod modName="FS25_modC" title="Mod C" version="3.0.0.0" required="false" fileHash="ccc" />
     <mod modName="pdlc_Premium" title="DLC"  version="1.0"   required="true"  fileHash="ddd" />
 </careerSavegame>"""
 
@@ -63,8 +63,8 @@ class TestParseSavegame:
     def test_mods_extracted_as_zip_filenames(self, tmp_path: Path) -> None:
         xml_path = _write_savegame(tmp_path, _SAVEGAME_XML)
         config = parse_savegame(xml_path)
-        assert "FS22_ModA.zip" in config.mod_filenames
-        assert "FS22_ModB.zip" in config.mod_filenames
+        assert "FS25_ModA.zip" in config.mod_filenames
+        assert "FS25_ModB.zip" in config.mod_filenames
 
     def test_pdlc_mods_filtered_out(self, tmp_path: Path) -> None:
         xml_path = _write_savegame(tmp_path, _SAVEGAME_XML)

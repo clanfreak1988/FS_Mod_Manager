@@ -82,8 +82,8 @@ def vm(tmp_path: Path, qtbot) -> MainViewModel:
 def vm_with_mods(tmp_path: Path, qtbot) -> tuple[MainViewModel, Path]:
     vm = _make_vm(tmp_path)
     collection = tmp_path / "collection"
-    _make_mod_zip(collection, "FS22_ModA.zip", "Mod A")
-    _make_mod_zip(collection, "FS22_ModB.zip", "Mod B")
+    _make_mod_zip(collection, "FS25_ModA.zip", "Mod A")
+    _make_mod_zip(collection, "FS25_ModB.zip", "Mod B")
     vm.initialize()
     return vm, tmp_path
 
@@ -98,12 +98,12 @@ class TestInitialize:
         assert vm.settings is not None
 
     def test_scans_collection_folder(self, vm: MainViewModel, tmp_path: Path) -> None:
-        _make_mod_zip(tmp_path / "collection", "FS22_ModA.zip")
+        _make_mod_zip(tmp_path / "collection", "FS25_ModA.zip")
         vm.initialize()
         assert len(vm.available_mods) == 1
 
     def test_available_mods_are_mod_instances(self, vm: MainViewModel, tmp_path: Path) -> None:
-        _make_mod_zip(tmp_path / "collection", "FS22_ModA.zip")
+        _make_mod_zip(tmp_path / "collection", "FS25_ModA.zip")
         vm.initialize()
         assert all(isinstance(m, Mod) for m in vm.available_mods)
 
@@ -121,7 +121,7 @@ class TestSignals:
     def test_available_mods_changed_emitted_on_init(
         self, vm: MainViewModel, tmp_path: Path, qtbot
     ) -> None:
-        _make_mod_zip(tmp_path / "collection", "FS22_ModA.zip")
+        _make_mod_zip(tmp_path / "collection", "FS25_ModA.zip")
         with qtbot.waitSignal(vm.available_mods_changed, timeout=1000):
             vm.initialize()
 
@@ -255,7 +255,7 @@ class TestSavegameImport:
         xml = sg_dir / "careerSavegame.xml"
         xml.write_text(
             '<?xml version="1.0"?><careerSavegame>'
-            '<mod modName="FS22_ModA" title="A" version="1.0" required="false" fileHash="x"/>'
+            '<mod modName="FS25_ModA" title="A" version="1.0" required="false" fileHash="x"/>'
             "</careerSavegame>",
             encoding="utf-8",
         )
@@ -269,7 +269,7 @@ class TestSavegameImport:
         xml = sg_dir / "careerSavegame.xml"
         xml.write_text(
             '<?xml version="1.0"?><careerSavegame>'
-            '<mod modName="FS22_ModA" title="A" version="1.0" required="false" fileHash="x"/>'
+            '<mod modName="FS25_ModA" title="A" version="1.0" required="false" fileHash="x"/>'
             "</careerSavegame>",
             encoding="utf-8",
         )
@@ -286,7 +286,7 @@ class TestExportSelectedMods:
         import zipfile
 
         vm, _ = vm_with_mods
-        mod_a = next(m for m in vm.available_mods if m.filename == "FS22_ModA.zip")
+        mod_a = next(m for m in vm.available_mods if m.filename == "FS25_ModA.zip")
         vm.move_to_selected([mod_a])
 
         target = tmp_path / "export" / "bundle.zip"
@@ -295,7 +295,7 @@ class TestExportSelectedMods:
 
         assert target.exists()
         with zipfile.ZipFile(target) as out:
-            assert out.namelist() == ["FS22_ModA.zip"]
+            assert out.namelist() == ["FS25_ModA.zip"]
 
     def test_empty_selection_emits_warning_and_writes_nothing(
         self, vm_with_mods, tmp_path: Path, qtbot
@@ -314,21 +314,21 @@ class TestExportSelectedMods:
         import zipfile
 
         vm, root = vm_with_mods
-        mod_a = next(m for m in vm.available_mods if m.filename == "FS22_ModA.zip")
-        mod_b = next(m for m in vm.available_mods if m.filename == "FS22_ModB.zip")
+        mod_a = next(m for m in vm.available_mods if m.filename == "FS25_ModA.zip")
+        mod_b = next(m for m in vm.available_mods if m.filename == "FS25_ModB.zip")
         vm.move_to_selected([mod_a, mod_b])
 
         # Simulate ModB's ZIP having disappeared from the collection folder
         # after it was already loaded into the selection.
-        (root / "collection" / "FS22_ModB.zip").unlink()
+        (root / "collection" / "FS25_ModB.zip").unlink()
 
         target = tmp_path / "bundle.zip"
         with qtbot.waitSignal(vm.warning_occurred, timeout=1000) as blocker:
             vm.export_selected_mods(target)
 
-        assert "FS22_ModB.zip" in blocker.args[0]
+        assert "FS25_ModB.zip" in blocker.args[0]
         with zipfile.ZipFile(target) as out:
-            assert out.namelist() == ["FS22_ModA.zip"]
+            assert out.namelist() == ["FS25_ModA.zip"]
 
 
 # ---------------------------------------------------------------------------
@@ -340,9 +340,9 @@ def vm_with_two_maps(tmp_path: Path, qtbot) -> tuple[MainViewModel, Path]:
     """Two map mods + one regular mod, all sitting in "available"."""
     vm = _make_vm(tmp_path)
     collection = tmp_path / "collection"
-    _make_mod_zip(collection, "FS22_MapA.zip", "Map A", is_map=True)
-    _make_mod_zip(collection, "FS22_MapB.zip", "Map B", is_map=True)
-    _make_mod_zip(collection, "FS22_Regular.zip", "Regular Mod")
+    _make_mod_zip(collection, "FS25_MapA.zip", "Map A", is_map=True)
+    _make_mod_zip(collection, "FS25_MapB.zip", "Map B", is_map=True)
+    _make_mod_zip(collection, "FS25_Regular.zip", "Regular Mod")
     vm.initialize()
     return vm, tmp_path
 
@@ -350,17 +350,17 @@ def vm_with_two_maps(tmp_path: Path, qtbot) -> tuple[MainViewModel, Path]:
 class TestSingleActiveMap:
     def test_second_map_swaps_out_the_first(self, vm_with_two_maps, qtbot) -> None:
         vm, _ = vm_with_two_maps
-        map_a = next(m for m in vm.available_mods if m.filename == "FS22_MapA.zip")
-        map_b = next(m for m in vm.available_mods if m.filename == "FS22_MapB.zip")
+        map_a = next(m for m in vm.available_mods if m.filename == "FS25_MapA.zip")
+        map_b = next(m for m in vm.available_mods if m.filename == "FS25_MapB.zip")
 
         vm.move_to_selected([map_a])
-        assert [m.filename for m in vm.selected_mods] == ["FS22_MapA.zip"]
+        assert [m.filename for m in vm.selected_mods] == ["FS25_MapA.zip"]
 
         with qtbot.waitSignal(vm.warning_occurred, timeout=1000) as blocker:
             vm.move_to_selected([map_b])
 
-        assert [m.filename for m in vm.selected_mods] == ["FS22_MapB.zip"]
-        assert "FS22_MapA.zip" in [m.filename for m in vm.available_mods]
+        assert [m.filename for m in vm.selected_mods] == ["FS25_MapB.zip"]
+        assert "FS25_MapA.zip" in [m.filename for m in vm.available_mods]
         assert "Map A" in blocker.args[0]
         assert "Map B" in blocker.args[0]
 
@@ -368,26 +368,26 @@ class TestSingleActiveMap:
         self, vm_with_two_maps, qtbot
     ) -> None:
         vm, _ = vm_with_two_maps
-        map_a = next(m for m in vm.available_mods if m.filename == "FS22_MapA.zip")
-        map_b = next(m for m in vm.available_mods if m.filename == "FS22_MapB.zip")
+        map_a = next(m for m in vm.available_mods if m.filename == "FS25_MapA.zip")
+        map_b = next(m for m in vm.available_mods if m.filename == "FS25_MapB.zip")
 
         with qtbot.waitSignal(vm.warning_occurred, timeout=1000):
             vm.move_to_selected([map_a, map_b])
 
-        assert [m.filename for m in vm.selected_mods] == ["FS22_MapB.zip"]
-        assert "FS22_MapA.zip" in [m.filename for m in vm.available_mods]
+        assert [m.filename for m in vm.selected_mods] == ["FS25_MapB.zip"]
+        assert "FS25_MapA.zip" in [m.filename for m in vm.available_mods]
 
     def test_non_map_mods_unaffected_alongside_a_map(
         self, vm_with_two_maps, qtbot
     ) -> None:
         vm, _ = vm_with_two_maps
-        map_a = next(m for m in vm.available_mods if m.filename == "FS22_MapA.zip")
-        regular = next(m for m in vm.available_mods if m.filename == "FS22_Regular.zip")
+        map_a = next(m for m in vm.available_mods if m.filename == "FS25_MapA.zip")
+        regular = next(m for m in vm.available_mods if m.filename == "FS25_Regular.zip")
 
         vm.move_to_selected([map_a, regular])
 
         selected = {m.filename for m in vm.selected_mods}
-        assert selected == {"FS22_MapA.zip", "FS22_Regular.zip"}
+        assert selected == {"FS25_MapA.zip", "FS25_Regular.zip"}
 
     def test_move_all_to_selected_keeps_only_one_map(
         self, vm_with_two_maps, qtbot
@@ -406,14 +406,14 @@ class TestSingleActiveMap:
         self, vm_with_two_maps, qtbot
     ) -> None:
         vm, _ = vm_with_two_maps
-        map_a = next(m for m in vm.available_mods if m.filename == "FS22_MapA.zip")
+        map_a = next(m for m in vm.available_mods if m.filename == "FS25_MapA.zip")
 
         received = []
         vm.warning_occurred.connect(received.append)
         vm.move_to_selected([map_a])
 
         assert received == []
-        assert [m.filename for m in vm.selected_mods] == ["FS22_MapA.zip"]
+        assert [m.filename for m in vm.selected_mods] == ["FS25_MapA.zip"]
 
     def test_select_config_with_two_maps_keeps_only_one(
         self, vm_with_two_maps, qtbot
@@ -425,7 +425,7 @@ class TestSingleActiveMap:
         vm._config_svc.save(
             Configuration(
                 name="BadConfig",
-                mod_filenames=["FS22_MapA.zip", "FS22_MapB.zip", "FS22_Regular.zip"],
+                mod_filenames=["FS25_MapA.zip", "FS25_MapB.zip", "FS25_Regular.zip"],
             )
         )
 
@@ -434,7 +434,7 @@ class TestSingleActiveMap:
 
         map_filenames = [m.filename for m in vm.selected_mods if m.is_map]
         assert len(map_filenames) == 1
-        assert "FS22_Regular.zip" in [m.filename for m in vm.selected_mods]
+        assert "FS25_Regular.zip" in [m.filename for m in vm.selected_mods]
 
     def test_activate_refuses_when_two_maps_selected(
         self, vm_with_two_maps, qtbot, monkeypatch
@@ -442,8 +442,8 @@ class TestSingleActiveMap:
         """Safety net at activation time, bypassing the normal move methods
         entirely to simulate the invariant somehow being violated anyway."""
         vm, _ = vm_with_two_maps
-        map_a = next(m for m in vm.available_mods if m.filename == "FS22_MapA.zip")
-        map_b = next(m for m in vm.available_mods if m.filename == "FS22_MapB.zip")
+        map_a = next(m for m in vm.available_mods if m.filename == "FS25_MapA.zip")
+        map_b = next(m for m in vm.available_mods if m.filename == "FS25_MapB.zip")
         vm._selected_mods = [map_a, map_b]  # bypass _enforce_single_active_map()
 
         activated = []
@@ -468,4 +468,4 @@ class TestSingleActiveMap:
         vm.move_all_to_selected()
 
         assert received == []
-        assert {m.filename for m in vm.selected_mods} == {"FS22_ModA.zip", "FS22_ModB.zip"}
+        assert {m.filename for m in vm.selected_mods} == {"FS25_ModA.zip", "FS25_ModB.zip"}

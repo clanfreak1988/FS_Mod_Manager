@@ -8,7 +8,7 @@ from fsmodmanager.core.parser.mod_parser import ModParseError, parse_mod
 class TestParseModSuccess:
     def test_filename_is_zip_basename(self, mod_en_dds: Path) -> None:
         mod = parse_mod(mod_en_dds)
-        assert mod.filename == "FS22_ModEnDds.zip"
+        assert mod.filename == "FS25_ModEnDds.zip"
 
     def test_author_extracted(self, mod_en_dds: Path) -> None:
         mod = parse_mod(mod_en_dds)
