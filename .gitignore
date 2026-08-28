@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+MIGRATION_PLAN.md
+
+# pytest
+.pytest_cache/
+
+# Integration test fixtures – echte Mod-ZIPs, nicht committen (Copyright + Dateigröße)
+tests/integration/fixtures/

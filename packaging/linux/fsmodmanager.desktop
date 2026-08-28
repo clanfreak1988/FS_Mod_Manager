@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FS Mod Manager
+Comment=Mod-Manager für Farming Simulator
+Exec=fsmodmanager
+Icon=fsmodmanager
+Categories=Game;Utility;
+Terminal=false
