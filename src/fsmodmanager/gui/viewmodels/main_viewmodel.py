@@ -11,6 +11,7 @@ Dependency injection via __init__ keeps everything testable without a display.
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from PySide6.QtCore import QObject, Signal
 log = logging.getLogger(__name__)
 
 from fsmodmanager.core.model.configuration import Configuration
+from fsmodmanager.core.model.game_profile import GameProfile
 from fsmodmanager.core.model.mod import Mod, is_valid_mod_name, sanitize_mod_name
 from fsmodmanager.core.model.settings import Settings
 from fsmodmanager.core.parser.mod_parser import ModParseError, parse_mod
@@ -53,6 +55,10 @@ class MainViewModel(QObject):
         Emitted when the set of saved configurations changes.
     active_config_changed(str)
         Emitted when the active configuration name changes.
+    profiles_changed(list[str])
+        Emitted when the set of game profiles changes.
+    active_profile_changed(str)
+        Emitted when a different game profile becomes active.
     new_mods_detected(list[str])
         Emitted after collect(); filenames of newly moved mods (for highlighting).
     conflicts_detected(list)
@@ -70,6 +76,8 @@ class MainViewModel(QObject):
     selected_mods_changed = Signal(list)    # list[Mod]
     config_names_changed = Signal(list)     # list[str]
     active_config_changed = Signal(str)
+    profiles_changed = Signal(list)         # list[str]
+    active_profile_changed = Signal(str)
     new_mods_detected = Signal(list)        # list[str]
     conflicts_detected = Signal(list)       # list[MoveConflict]
     status_changed = Signal(str)
@@ -279,6 +287,67 @@ class MainViewModel(QObject):
             self._set_active_config(new_name)
         self.config_names_changed.emit(self._config_svc.list_names())
 
+    def assign_mods_to_configs(self, assignments: dict[str, list[str]]) -> None:
+        """Add mod filenames to saved configurations, many-to-many.
+
+        `assignments` maps a configuration name to the filenames that should
+        be added to it; the same filename may appear under several configs
+        and a config may receive several filenames. Filenames a config
+        already lists are skipped, so re-applying an assignment is a no-op.
+        Unknown config names are ignored rather than created - the caller
+        offers a list of existing configs to choose from.
+
+        Used by the "neue Mods gefunden" dialog after startup's collect().
+        """
+        map_filenames = {
+            m.filename for m in self._available_mods + self._selected_mods if m.is_map
+        }
+        changed_configs: list[str] = []
+        rejected_maps: list[tuple[str, str]] = []
+        for name, filenames in assignments.items():
+            if not filenames or not self._config_svc.exists(name):
+                log.warning("Skipping assignment to unknown config %r", name)
+                continue
+            config = self._config_svc.load(name)
+            existing = set(config.mod_filenames)
+            # A config must never end up with two maps - "alle neuen Mods zu
+            # allen Konfigurationen" would otherwise quietly put a new map
+            # into every single one, only for select_config() to bounce it
+            # again later. Refuse it here and say so instead.
+            has_map = bool(existing & map_filenames)
+            added: list[str] = []
+            for fn in filenames:
+                if fn in existing:
+                    continue
+                if fn in map_filenames:
+                    if has_map:
+                        rejected_maps.append((fn, name))
+                        continue
+                    has_map = True
+                added.append(fn)
+            if not added:
+                continue
+            self._config_svc.save(
+                Configuration(name=name, mod_filenames=[*config.mod_filenames, *added])
+            )
+            changed_configs.append(name)
+            log.info("Added %d mod(s) to config %r", len(added), name)
+
+        self._warn_about_rejected_maps(rejected_maps)
+
+        if not changed_configs:
+            self.status_changed.emit("Keine Zuordnung vorgenommen")
+            return
+
+        # Reload the active config so its column reflects what was just
+        # written to disk (no-op if the active one wasn't among them).
+        if self._active_config_name in changed_configs:
+            self.select_config(self._active_config_name)
+
+        self.status_changed.emit(
+            f"Neue Mods zu {len(changed_configs)} Konfiguration(en) hinzugefügt"
+        )
+
     # ------------------------------------------------------------------
     # Mod list manipulation
     # ------------------------------------------------------------------
@@ -384,6 +453,178 @@ class MainViewModel(QObject):
         self.status_changed.emit(
             f"{len(result.exported)} Mod(s) exportiert nach {result.target_path.name}"
         )
+
+    # ------------------------------------------------------------------
+    # Game profiles (several FS installations side by side)
+    # ------------------------------------------------------------------
+
+    @property
+    def profile_names(self) -> list[str]:
+        return self._settings.profile_names if self._settings else []
+
+    @property
+    def active_profile_name(self) -> str:
+        return self._settings.active_profile if self._settings else ""
+
+    def switch_profile(self, name: str) -> None:
+        """Make another FS installation the active one.
+
+        Persists the current profile's state, applies the new one and runs
+        the full initialize() again - which re-points the ConfigService at
+        the new collection folder, collects that installation's new mods and
+        refills both mod lists. Symlinks already placed in the *previous*
+        installation's mods folder are deliberately left alone: each game
+        keeps whatever was last activated for it.
+        """
+        if self._settings is None or name == self._settings.active_profile:
+            return
+        if name not in self._settings.profile_names:
+            self.error_occurred.emit(f"Unbekannte Spielversion: '{name}'")
+            return
+
+        # Fold anything the session changed (active_modpack, savegames_read)
+        # back into the profile being left, before its fields are overwritten.
+        self._settings.sync_active_profile()
+        self._settings.apply_profile(name)
+        self._settings_svc.save(self._settings)
+        # The old config name belongs to the old collection folder - it must
+        # not survive into a profile whose configs live somewhere else.
+        self._set_active_config("")
+        self.initialize()
+        self.active_profile_changed.emit(name)
+        self.config_names_changed.emit(self._config_svc.list_names())
+        self.status_changed.emit(f"Spielversion '{name}' aktiv")
+        self._warn_about_missing_profile_folders(self._settings.active_game_profile)
+
+    def add_profile(self, profile: GameProfile) -> bool:
+        """Add a new game profile (without switching to it). False on error."""
+        if self._settings is None:
+            return False
+        error = self._validate_profile(profile)
+        if error:
+            self.error_occurred.emit(error)
+            return False
+        self._settings.profiles = [*self._settings.profiles, profile]
+        self._settings_svc.save(self._settings)
+        self.profiles_changed.emit(self._settings.profile_names)
+        self.status_changed.emit(f"Spielversion '{profile.name}' angelegt")
+        return True
+
+    def update_active_profile(self, profile: GameProfile) -> bool:
+        """Apply an edited name/paths to the currently active profile.
+
+        savegames_read and active_modpack are kept from the stored profile -
+        they are state, not something the edit form shows. Changing paths
+        here only re-points the profile; it never moves files (that is what
+        the settings dialog's folder-move prompt is for).
+        """
+        if self._settings is None:
+            return False
+        current = self._settings.active_game_profile
+        error = self._validate_profile(profile, ignore_name=current.name)
+        if error:
+            self.error_occurred.emit(error)
+            return False
+
+        updated = GameProfile(
+            name=profile.name,
+            source_mod_folder=profile.source_mod_folder,
+            mod_collection_folder=profile.mod_collection_folder,
+            savegame_path=profile.savegame_path,
+            savegames_read=current.savegames_read,
+            active_modpack=current.active_modpack,
+        )
+        self._settings.profiles = [
+            updated if p is current else p for p in self._settings.profiles
+        ]
+        self._settings.apply_profile(updated.name)
+        self._settings_svc.save(self._settings)
+        self.profiles_changed.emit(self._settings.profile_names)
+        self.active_profile_changed.emit(updated.name)
+        self.status_changed.emit(f"Spielversion '{updated.name}' geändert")
+        return True
+
+    def delete_profile(self, name: str) -> bool:
+        """Remove a profile. Never touches any files on disk."""
+        if self._settings is None:
+            return False
+        if name not in self._settings.profile_names:
+            self.error_occurred.emit(f"Unbekannte Spielversion: '{name}'")
+            return False
+        if name == self._settings.active_profile:
+            self.error_occurred.emit(
+                f"'{name}' ist gerade aktiv und kann nicht gelöscht werden. "
+                "Bitte zuerst auf eine andere Spielversion wechseln."
+            )
+            return False
+
+        self._settings.profiles = [
+            p for p in self._settings.profiles if p.name != name
+        ]
+        self._settings_svc.save(self._settings)
+        self.profiles_changed.emit(self._settings.profile_names)
+        self.status_changed.emit(f"Spielversion '{name}' gelöscht")
+        return True
+
+    def _validate_profile(
+        self, profile: GameProfile, ignore_name: str | None = None
+    ) -> str | None:
+        """Return an error message if `profile` may not be stored, else None.
+
+        Two profiles sharing a collection folder would silently share their
+        configurations (they live next to it), and two sharing a mods folder
+        would overwrite each other's symlinks - both look like data loss to
+        the user, so they are refused up front.
+        """
+        assert self._settings is not None
+        name = profile.name.strip()
+        if not name:
+            return "Der Name der Spielversion darf nicht leer sein."
+
+        others = [
+            p
+            for p in self._settings.profiles
+            if ignore_name is None or p.name != ignore_name
+        ]
+        if any(p.name.casefold() == name.casefold() for p in others):
+            return f"Eine Spielversion mit dem Namen '{name}' existiert bereits."
+
+        for other in others:
+            if self._same_path(other.mod_collection_folder, profile.mod_collection_folder):
+                return (
+                    f"Der Sammelordner wird bereits von '{other.name}' benutzt. "
+                    "Jede Spielversion braucht einen eigenen Sammelordner, sonst "
+                    "teilen sich beide ihre Konfigurationen."
+                )
+            if self._same_path(other.source_mod_folder, profile.source_mod_folder):
+                return (
+                    f"Der Mod-Ordner wird bereits von '{other.name}' benutzt. "
+                    "Jede Spielversion braucht einen eigenen Mod-Ordner."
+                )
+        return None
+
+    @staticmethod
+    def _same_path(a: str, b: str) -> bool:
+        def norm(raw: str) -> str:
+            return os.path.normcase(os.path.abspath(os.path.expanduser(raw)))
+
+        return norm(a) == norm(b)
+
+    def _warn_about_missing_profile_folders(self, profile: GameProfile) -> None:
+        missing = [
+            label
+            for label, raw in (
+                ("Mod-Ordner", profile.source_mod_folder),
+                ("Sammelordner", profile.mod_collection_folder),
+                ("Savegame-Pfad", profile.savegame_path),
+            )
+            if not Path(raw).is_dir()
+        ]
+        if missing:
+            self.warning_occurred.emit(
+                f"Für '{profile.name}' fehlen folgende Ordner: "
+                f"{', '.join(missing)}.\nBitte in den Einstellungen prüfen."
+            )
 
     # ------------------------------------------------------------------
     # Settings
@@ -652,6 +893,17 @@ class MainViewModel(QObject):
     def _set_active_config(self, name: str) -> None:
         self._active_config_name = name
         self.active_config_changed.emit(name)
+
+    def _warn_about_rejected_maps(self, rejected: list[tuple[str, str]]) -> None:
+        """Tell the user which map/config pairs assign_mods_to_configs()
+        refused because the config already contains a map."""
+        if not rejected:
+            return
+        lines = "\n".join(f"  • {fn} → {name}" for fn, name in rejected)
+        self.warning_occurred.emit(
+            "Folgende Karten wurden nicht hinzugefügt, weil die Konfiguration "
+            f"bereits eine Karte enthält:\n{lines}"
+        )
 
     @staticmethod
     def _sort_key(mod: Mod) -> str:

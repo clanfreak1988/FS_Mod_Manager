@@ -100,6 +100,40 @@ Dateien an den neuen Ort mit verschoben werden sollen.
   oder über die Pfeil-Buttons (→/← je markierte Mods, ⇒/⇐ alle auf einmal).
 - Über die Suchfelder oberhalb jeder Spalte lässt sich nach Titel filtern.
 
+### Mehrere Spielversionen
+
+Ganz links in der Toolbar steht der Button **"Spiel: FS25 ▾"**. Darüber lassen
+sich mehrere Farming-Simulator-Installationen parallel verwalten – jede mit
+eigenem Mod-Ordner, eigenem Sammelordner und damit auch eigenen
+Konfigurationen (die Konfigurationsdateien liegen neben dem Sammelordner).
+
+Das Menü des Buttons enthält:
+
+- die vorhandenen Spielversionen; ein Klick wechselt sofort dorthin
+  (Mod-Listen, Konfigurationsauswahl und Fenstertitel stellen sich um),
+- **"Neue Spielversion…"**: Dialog mit einer Vorlage-Auswahl (FS25, FS22, …),
+  die Name und alle drei Pfade aus dem Standard-Ordner der jeweiligen Version
+  vorbelegt. Fehlt der Sammelordner noch, legt ihn der Button **"Anlegen"** an,
+- **"'…' bearbeiten…"**: Name und Pfade der aktiven Spielversion ändern,
+- **"Spielversion löschen"**: entfernt nur den Eintrag – Mod-Ordner,
+  Sammelordner und Konfigurationen bleiben unangetastet. Die gerade aktive
+  Spielversion lässt sich nicht löschen, dafür vorher wechseln.
+
+Beim ersten Start mit dieser Version wird die bisherige Einrichtung automatisch
+zur ersten Spielversion (benannt nach ihrem Spielordner, z.B. "FS25") – es ist
+nichts weiter zu tun.
+
+Zu beachten:
+
+- Zwei Spielversionen dürfen sich weder Mod- noch Sammelordner teilen; der
+  Mod Manager lehnt das beim Anlegen ab.
+- Beim Wechsel bleiben die Symlinks der vorherigen Spielversion in deren
+  Mod-Ordner liegen. Das ist Absicht: jedes Spiel behält seinen zuletzt
+  aktivierten Stand.
+- Das Ändern der Pfade im Spielversions-Dialog verschiebt keine Dateien.
+  Dafür gibt es die Pfadfelder unter **Einstellungen**, die beim Ändern
+  anbieten, die Mods mitzunehmen.
+
 ### Neue Mods hinzufügen
 
 Neue ZIP-Dateien einfach in den **FS Mod-Ordner** legen und **"Neu laden"**
@@ -107,6 +141,26 @@ klicken. Der Mod Manager verschiebt sie automatisch in den Sammelordner und
 verlinkt sie zurück. Liegt dort bereits eine Datei gleichen Namens, erscheint
 ein Dialog zur Konfliktlösung (siehe unten). Neu erkannte Mods werden in
 beiden Spalten kurz farblich hervorgehoben.
+
+Werden beim Programmstart neue Mods eingesammelt, erscheint anschließend –
+sofern schon Konfigurationen existieren – das Fenster
+**"Neue Mods gefunden"**: eine Kreuztabelle mit den neuen Mods als Zeilen und
+den Konfigurationen als Spalten. Damit lässt sich in einem Rutsch festlegen,
+welcher Mod in welche Konfiguration soll – ein Mod kann in mehrere
+Konfigurationen, eine Konfiguration kann mehrere Mods aufnehmen:
+
+- Ein Klick auf einen **Spaltenkopf** kreuzt die ganze Spalte an bzw. ab
+  (alle neuen Mods in dieser Konfiguration).
+- Ein Klick auf einen **Zeilenkopf** entsprechend die ganze Zeile
+  (dieser Mod in allen Konfigurationen).
+- **"Alle Mods zu allen Konfigurationen"** kreuzt alles an,
+  **"Auswahl aufheben"** setzt alles zurück.
+- **"Hinzufügen"** schreibt die Zuordnung in die Konfigurationsdateien,
+  **"Überspringen"** ändert nichts.
+
+Karten sind in der Tabelle mit *(Karte)* gekennzeichnet. Da eine Konfiguration
+immer nur eine Karte enthalten darf, wird eine Karte für Konfigurationen, die
+bereits eine haben, übersprungen – mit einem Hinweis, welche das betrifft.
 
 ### Konfigurationen
 

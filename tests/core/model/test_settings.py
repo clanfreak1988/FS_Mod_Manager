@@ -27,6 +27,8 @@ class TestSettingsSerialization:
             "scene_width",
             "scene_height",
             "theme",
+            "profiles",
+            "active_profile",
         }
 
     def test_roundtrip_json(self, sample_settings: Settings) -> None:

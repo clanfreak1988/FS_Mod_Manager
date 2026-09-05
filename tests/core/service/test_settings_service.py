@@ -234,3 +234,48 @@ class TestWindowsDocumentsDir:
         settings = svc.load()
 
         assert settings.savegame_path == str(game_home)
+
+
+class TestProfileHelpers:
+    def test_save_folds_top_level_edits_into_the_active_profile(
+        self, svc: SettingsService, sample_settings: Settings
+    ) -> None:
+        """Everything in the app edits the flat fields; save() is the single
+        point where that has to reach the profile they belong to."""
+        sample_settings.active_modpack = "Winter"
+        sample_settings.mod_collection_folder = "/anderswo"
+
+        svc.save(sample_settings)
+        restored = svc.load()
+
+        assert restored.active_game_profile.active_modpack == "Winter"
+        assert restored.active_game_profile.mod_collection_folder == "/anderswo"
+
+    def test_defaults_come_with_exactly_one_profile(self, tmp_path: Path) -> None:
+        svc = SettingsService(data_dir=tmp_path / "data")
+        settings = svc.load(ask_for_path=lambda: str(tmp_path / "FarmingSimulator2025"))
+        assert len(settings.profiles) == 1
+        assert settings.active_profile == settings.profiles[0].name
+
+    def test_default_game_home_uses_the_requested_year(self) -> None:
+        from fsmodmanager.core.service.settings_service import default_game_home
+
+        assert default_game_home("2022").name == "FarmingSimulator2022"
+        assert default_game_home("2022").parent.name == "My Games"
+
+    def test_default_profile_lays_out_mods_and_collection(self) -> None:
+        from fsmodmanager.core.service.settings_service import default_profile
+
+        profile = default_profile("FS22", Path("/games/FarmingSimulator2022"))
+        assert profile.source_mod_folder == str(Path("/games/FarmingSimulator2022/mods"))
+        assert profile.mod_collection_folder == str(
+            Path("/games/FarmingSimulator2022/LS_mods")
+        )
+        assert profile.savegame_path == str(Path("/games/FarmingSimulator2022"))
+
+    def test_fs_versions_are_offered_newest_first(self) -> None:
+        from fsmodmanager.core.service.settings_service import FS_VERSIONS
+
+        years = [year for _label, year in FS_VERSIONS]
+        assert years == sorted(years, reverse=True)
+        assert "2025" in years

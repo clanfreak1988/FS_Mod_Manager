@@ -4,12 +4,47 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fsmodmanager.core.app_paths import DATA_DIR
+from fsmodmanager.core.model.game_profile import GameProfile
 from fsmodmanager.core.model.settings import Settings
 
 _SETTINGS_FILE = "settings.json"
 
 # Relative to the user's Documents folder – matches the Java default paths.
-_FS_SUBPATH = Path("My Games") / "FarmingSimulator2025"
+_MY_GAMES = Path("My Games")
+_FS_SUBPATH = _MY_GAMES / "FarmingSimulator2025"
+
+# Offered as templates when a new game profile is created. The year is the
+# one FS uses in its "My Games" folder name; the label is what the user sees.
+FS_VERSIONS: list[tuple[str, str]] = [
+    ("Farming Simulator 25", "2025"),
+    ("Farming Simulator 22", "2022"),
+    ("Farming Simulator 19", "2019"),
+    ("Farming Simulator 17", "2017"),
+]
+
+
+def documents_dir() -> Path:
+    """The user's real Documents folder (registry-resolved on Windows)."""
+    return _windows_documents_dir() or (Path.home() / "Documents")
+
+
+def default_game_home(year: str) -> Path:
+    """Standard game-home path for an FS release, e.g. "2022"."""
+    return documents_dir() / _MY_GAMES / f"FarmingSimulator{year}"
+
+
+def default_profile(name: str, game_home: Path) -> GameProfile:
+    """A profile pre-filled with the standard folder layout under `game_home`.
+
+    Mirrors the defaults SettingsService uses on a first run, so a second
+    FS installation added later starts out laid out exactly like the first.
+    """
+    return GameProfile(
+        name=name,
+        source_mod_folder=str(game_home / "mods"),
+        mod_collection_folder=str(game_home / "LS_mods"),
+        savegame_path=str(game_home),
+    )
 
 
 def _windows_documents_dir() -> Path | None:
@@ -95,7 +130,14 @@ class SettingsService:
         return self._build_defaults(ask_for_path)
 
     def save(self, settings: Settings) -> None:
-        """Persist settings to disk (creates directories if needed)."""
+        """Persist settings to disk (creates directories if needed).
+
+        The top-level path fields are folded back into the active profile
+        first: everything in the app edits those flat fields (settings
+        dialog, activate_config()), and this is the single choke point
+        where that has to reach the profile they belong to.
+        """
+        settings.sync_active_profile()
         self._data_dir.mkdir(parents=True, exist_ok=True)
         self._settings_file.write_text(settings.to_json(), encoding="utf-8")
 
@@ -122,8 +164,7 @@ class SettingsService:
         ``<Documents>/My Games/FarmingSimulator2025`` location.  Falls back
         to the `ask_for_path` callback if that directory does not exist.
         """
-        documents_dir = _windows_documents_dir() or (Path.home() / "Documents")
-        default = documents_dir / _FS_SUBPATH
+        default = documents_dir() / _FS_SUBPATH
         if default.exists():
             return default
         if ask_for_path is not None:

@@ -25,7 +25,7 @@ import re
 from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, QPoint, Qt, QTimer, QUrl, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -42,15 +42,19 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QStatusBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from fsmodmanager.core.app_paths import LOG_FILE
+from fsmodmanager.core.model.game_profile import GameProfile
 from fsmodmanager.core.model.mod import Mod, is_valid_mod_name
 from fsmodmanager.core.service.collection_service import ConflictResolution, MoveConflict
 from fsmodmanager.gui.dialogs.input_device_cleanup_dialog import InputDeviceCleanupDialog
 from fsmodmanager.gui.dialogs.move_prompt_dialog import MovePromptDialog
+from fsmodmanager.gui.dialogs.new_mods_dialog import NewModsAssignDialog
+from fsmodmanager.gui.dialogs.profile_dialog import ProfileEditDialog
 from fsmodmanager.gui.dialogs.rename_conflict_dialog import RenameConflictDialog
 from fsmodmanager.gui.dialogs.settings_dialog import SettingsDialog
 from fsmodmanager.gui.icon import app_icon
@@ -64,6 +68,9 @@ class MainWindow(QMainWindow):
     def __init__(self, view_model: MainViewModel, parent=None) -> None:
         super().__init__(parent)
         self._vm = view_model
+        # Filled by _on_new_mods_detected, drained by _offer_new_mod_assignment.
+        self._pending_new_mods: list[str] = []
+        self._delete_profile_menu: QMenu | None = None
         self.setWindowTitle("FS Mod Manager")
         self.setWindowIcon(app_icon())
         self.resize(1150, 700)
@@ -87,6 +94,18 @@ class MainWindow(QMainWindow):
     def _build_config_bar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
         bar.setSpacing(4)
+
+        # One button for everything to do with FS installations: switching
+        # between them and managing the list. A second ComboBox next to the
+        # configuration one would read as a second configuration selector.
+        self._btn_profile = QToolButton()
+        self._btn_profile.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._btn_profile.setToolTip(
+            "Spielversion wechseln oder verwalten. Jede Spielversion hat "
+            "eigene Mod- und Sammelordner und damit eigene Konfigurationen."
+        )
+        self._rebuild_profile_menu()
+        bar.addWidget(self._btn_profile)
 
         bar.addWidget(QLabel("Konfiguration:"))
 
@@ -216,6 +235,8 @@ class MainWindow(QMainWindow):
         vm.conflicts_detected.connect(self._on_conflicts_detected)
         vm.warning_occurred.connect(self._on_warning_occurred)
         vm.new_mods_detected.connect(self._on_new_mods_detected)
+        vm.profiles_changed.connect(self._on_profiles_changed)
+        vm.active_profile_changed.connect(self._on_profiles_changed)
         self._btn_reload.clicked.connect(self._vm.reload)
 
         # ── Config-bar buttons ────────────────────────────────────────────────
@@ -502,6 +523,7 @@ class MainWindow(QMainWindow):
             # (collection scan, config service path, etc.)
             self._vm.initialize()
             self._update_after_init()
+            self._offer_new_mod_assignment()
 
     def _move_folders_if_changed(self, old_settings, new_settings) -> None:
         """Offer to physically move mod files when Settings paths changed.
@@ -617,6 +639,13 @@ class MainWindow(QMainWindow):
         self._available_list.list_model.set_highlighted(highlighted)
         self._selected_list.list_model.set_highlighted(highlighted)
 
+        # Remembered for _offer_new_mod_assignment(), which runs once the
+        # rest of initialize() is through. Assigning here would be too early:
+        # this signal is emitted before the collect() conflicts are resolved
+        # and before the first-run savegame import has had a chance to create
+        # the very configs the user would want to assign to.
+        self._pending_new_mods = list(filenames)
+
     @Slot()
     def _build_info_menu(self) -> QMenu:
         menu = QMenu(self)
@@ -644,6 +673,151 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Log-Ordner", f"Log-Ordner nicht gefunden:\n{LOG_FILE.parent}")
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(LOG_FILE.parent)))
+
+    # ── game profiles (several FS installations) ──────────────────────────────
+
+    def _rebuild_profile_menu(self) -> None:
+        """(Re)build the "Spiel: …" button's dropdown from the ViewModel."""
+        if not hasattr(self, "_profile_menu"):
+            self._profile_menu = QMenu(self)
+            self._btn_profile.setMenu(self._profile_menu)
+
+        names = self._vm.profile_names
+        active = self._vm.active_profile_name
+        self._btn_profile.setText(f"Spiel: {active}" if active else "Spiel: –")
+
+        self._profile_menu.clear()
+        if self._delete_profile_menu is not None:
+            # clear() drops the actions but not the submenu object itself.
+            self._delete_profile_menu.deleteLater()
+            self._delete_profile_menu = None
+
+        for name in names:
+            action = QAction(name, self._profile_menu)
+            action.setCheckable(True)
+            action.setChecked(name == active)
+            action.triggered.connect(
+                lambda _checked=False, n=name: self._on_switch_profile(n)
+            )
+            self._profile_menu.addAction(action)
+
+        if names:
+            self._profile_menu.addSeparator()
+        self._profile_menu.addAction("Neue Spielversion…", self._on_new_profile)
+        if active:
+            self._profile_menu.addAction(
+                f"'{active}' bearbeiten…", self._on_edit_profile
+            )
+
+        deletable = [n for n in names if n != active]
+        self._delete_profile_menu = self._profile_menu.addMenu("Spielversion löschen")
+        self._delete_profile_menu.setEnabled(bool(deletable))
+        for name in deletable:
+            self._delete_profile_menu.addAction(
+                name, lambda n=name: self._on_delete_profile(n)
+            )
+
+    def _update_window_title(self) -> None:
+        """Show the active installation - activating the wrong game's mods
+        because two windows look identical is easy to do otherwise."""
+        active = self._vm.active_profile_name
+        self.setWindowTitle(f"FS Mod Manager – {active}" if active else "FS Mod Manager")
+
+    @Slot()
+    def _on_profiles_changed(self, *_args) -> None:
+        self._rebuild_profile_menu()
+        self._update_window_title()
+
+    def _on_switch_profile(self, name: str) -> None:
+        if name == self._vm.active_profile_name:
+            # Clicking the already-active entry unchecks it visually; the
+            # rebuild puts the checkmark back.
+            self._rebuild_profile_menu()
+            return
+        self._vm.switch_profile(name)
+        self._run_startup_flow()
+
+    def _on_new_profile(self) -> None:
+        dialog = ProfileEditDialog(existing_names=self._vm.profile_names, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.profile is None:
+            return
+        profile = dialog.profile
+        if not self._vm.add_profile(profile):
+            return
+        reply = QMessageBox.question(
+            self,
+            "Spielversion",
+            f"'{profile.name}' wurde angelegt.\n\nJetzt dorthin wechseln?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._on_switch_profile(profile.name)
+
+    def _on_edit_profile(self) -> None:
+        if self._vm.settings is None:
+            return
+        current = self._vm.settings.active_game_profile
+        others = [n for n in self._vm.profile_names if n != current.name]
+        dialog = ProfileEditDialog(current, existing_names=others, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.profile is None:
+            return
+        edited = dialog.profile
+        if not self._vm.update_active_profile(edited):
+            return
+        if self._profile_paths_differ(current, edited):
+            # Same situation as the settings dialog changing paths: the
+            # collection has to be re-scanned and the ConfigService re-pointed.
+            self._vm.initialize()
+            self._run_startup_flow()
+
+    @staticmethod
+    def _profile_paths_differ(a: GameProfile, b: GameProfile) -> bool:
+        return (
+            a.source_mod_folder != b.source_mod_folder
+            or a.mod_collection_folder != b.mod_collection_folder
+            or a.savegame_path != b.savegame_path
+        )
+
+    def _on_delete_profile(self, name: str) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Spielversion löschen",
+            f"'{name}' wirklich aus der Liste entfernen?\n\n"
+            "Es werden keine Dateien gelöscht – Mod-Ordner, Sammelordner und "
+            "Konfigurationen dieser Spielversion bleiben unverändert.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._vm.delete_profile(name)
+
+    # ── new-mod assignment dialog ─────────────────────────────────────────────
+
+    def _offer_new_mod_assignment(self) -> None:
+        """Offer to add the mods collected this run to saved configurations.
+
+        Called after initialize() has fully run - i.e. once the collect()
+        conflicts are resolved and any savegame import has happened, so the
+        collection is in its final state and freshly imported configs are
+        already on the list. Silently does nothing when there is nothing to
+        assign or nowhere to assign it to.
+        """
+        filenames = set(self._pending_new_mods)
+        self._pending_new_mods = []
+        if not filenames:
+            return
+
+        # Only filenames that actually became a Mod: collect() moves every
+        # .zip, but an unreadable one is dropped by the collection scan and
+        # would otherwise be written into configs as a dead entry.
+        known = {m.filename: m for m in self._vm.available_mods + self._vm.selected_mods}
+        mods = [known[fn] for fn in sorted(filenames) if fn in known]
+        config_names = self._vm._config_svc.list_names()
+        if not mods or not config_names:
+            return
+
+        dialog = NewModsAssignDialog(mods, config_names, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._vm.assign_mods_to_configs(dialog.assignments)
 
     # ── conflict resolution dialog ────────────────────────────────────────────
 
@@ -743,7 +917,17 @@ class MainWindow(QMainWindow):
                 self._vm.save_settings(dialog.settings)
                 self._vm.initialize()
 
-        # One-time prompt: import all savegames as configs
+        self._run_startup_flow()
+
+    def _run_startup_flow(self) -> None:
+        """Everything that follows a completed initialize().
+
+        Shared by startup and by switching to another game profile: a
+        profile is a different FS installation, so its savegames have their
+        own one-time import prompt and its mods folder its own batch of
+        newly collected mods.
+        """
+        # One-time prompt per profile: import all savegames as configs
         if self._vm.settings and not self._vm.settings.savegames_read:
             reply = QMessageBox.question(
                 self,
@@ -758,9 +942,12 @@ class MainWindow(QMainWindow):
             self._vm.save_settings(s)
 
         self._update_after_init()
+        self._offer_new_mod_assignment()
 
     def _update_after_init(self) -> None:
         """Update widgets that depend on fully resolved settings."""
+        self._rebuild_profile_menu()
+        self._update_window_title()
         if self._vm.settings:
             coll = Path(self._vm.settings.mod_collection_folder)
             self._available_list.set_collection_dir(coll)

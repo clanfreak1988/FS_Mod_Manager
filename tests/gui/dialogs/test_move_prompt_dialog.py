@@ -86,6 +86,27 @@ class TestMovePromptDialog:
         assert "1.2.0.0" in labels
         assert "1.1.0.0" in labels
 
+    def test_new_file_column_comes_before_existing(self, qtbot) -> None:
+        """Column 1 is the incoming file, column 2 the one already in place -
+        matching the button order 'Neue übernehmen' / 'Vorhandene behalten'."""
+        from PySide6.QtWidgets import QGridLayout
+
+        dialog = MovePromptDialog(_conflict())
+        qtbot.addWidget(dialog)
+        grid = dialog.findChild(QGridLayout)
+
+        def cell(row: int, col: int) -> str:
+            return grid.itemAtPosition(row, col).widget().text()
+
+        assert "Neu" in cell(0, 1)
+        assert "Vorhanden" in cell(0, 2)
+        # source_version / target_version from _conflict()
+        assert cell(1, 1) == "1.2.0.0"
+        assert cell(1, 2) == "1.1.0.0"
+        # source_size 1024 / target_size 2048
+        assert cell(2, 1) == "1,024 Bytes"
+        assert cell(2, 2) == "2,048 Bytes"
+
     def test_unknown_version_shown_as_unbekannt(self, qtbot) -> None:
         dialog = MovePromptDialog(_conflict(source_version="", target_version=""))
         qtbot.addWidget(dialog)

@@ -121,6 +121,59 @@ def _make_vm(tmp: Path) -> MainViewModel:
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
+def _make_two_game_vm(tmp: Path) -> MainViewModel:
+    """Two separate FS installations under tmp, FS25 active.
+
+    Mirrors main.py's wiring: the configuration directory is derived from
+    each profile's collection folder, so switching profiles also switches
+    which configurations exist.
+    """
+    from fsmodmanager.core.model.game_profile import GameProfile
+
+    for sub in ("fs25/mods", "fs25/collection", "fs22/mods", "fs22/collection"):
+        (tmp / sub).mkdir(parents=True)
+    _make_mod_zip(tmp / "fs25/collection", "FS25_Only.zip", "Nur FS25")
+    _make_mod_zip(tmp / "fs22/collection", "FS22_Only.zip", "Nur FS22")
+
+    def _profile(name: str, home: str) -> GameProfile:
+        return GameProfile(
+            name=name,
+            source_mod_folder=str(tmp / home / "mods"),
+            mod_collection_folder=str(tmp / home / "collection"),
+            savegame_path=str(tmp / home),
+            savegames_read=True,
+        )
+
+    data_dir = tmp / "data"
+    SettingsService(data_dir=data_dir).save(Settings(
+        source_mod_folder=str(tmp / "fs25/mods"),
+        mod_collection_folder=str(tmp / "fs25/collection"),
+        savegame_path=str(tmp / "fs25"),
+        savegames_read=True,
+        profiles=[_profile("FS25", "fs25"), _profile("FS22", "fs22")],
+        active_profile="FS25",
+    ))
+    return MainViewModel(
+        settings_service=SettingsService(data_dir=data_dir),
+        config_service=ConfigService(configs_dir=tmp / "placeholder"),
+        link_service=LinkService(),
+        collection_service=CollectionService(),
+        configs_dir_factory=lambda s: Path(s.mod_collection_folder).parent / "configs",
+    )
+
+
+@pytest.fixture()
+def two_games(tmp_path, qtbot):
+    """A shown MainWindow wired to two FS installations."""
+    from fsmodmanager.gui.main_window import MainWindow
+
+    vm = _make_two_game_vm(tmp_path)
+    window = MainWindow(view_model=vm)
+    qtbot.addWidget(window)
+    _show_and_init(window, vm, qtbot)
+    return window, vm
+
+
 @pytest.fixture()
 def fs(tmp_path):
     """Simulated FS structure with three mod ZIPs in the source folder."""
@@ -756,6 +809,173 @@ class TestGuiEndToEnd:
 
         window._btn_move_all_right.click()
         assert window._selected_list.list_model._highlighted == expected
+
+    def test_new_mods_dialog_is_skipped_without_configurations(self, fs, qtbot, monkeypatch) -> None:
+        """Nothing to assign new mods *to* – the dialog must not appear at all
+        (it would be a modal dead end on a genuinely first run)."""
+        from fsmodmanager.gui.main_window import MainWindow
+
+        shown = []
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.NewModsAssignDialog.exec",
+            lambda self_dialog: shown.append(True) or 0,
+        )
+        vm = _make_vm(fs)
+        window = MainWindow(view_model=vm)
+        qtbot.addWidget(window)
+        _show_and_init(window, vm, qtbot)
+
+        assert not shown
+
+    def test_new_mods_dialog_writes_the_chosen_assignments(self, fs, qtbot, monkeypatch) -> None:
+        """The whole point of the dialog: several new mods land in several
+        configs in one pass, driven here by its "alle zu allen" button."""
+        from PySide6.QtWidgets import QDialog
+
+        from fsmodmanager.core.model.configuration import Configuration
+        from fsmodmanager.gui.main_window import MainWindow
+
+        cfg_svc = ConfigService(configs_dir=fs / "configs")
+        cfg_svc.save(Configuration(name="Alpha", mod_filenames=[]))
+        cfg_svc.save(Configuration(name="Beta", mod_filenames=["FS25_ModA.zip"]))
+
+        def accept_all(self_dialog):
+            self_dialog._btn_all.click()
+            return QDialog.DialogCode.Accepted
+
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.NewModsAssignDialog.exec", accept_all
+        )
+
+        vm = _make_vm(fs)
+        window = MainWindow(view_model=vm)
+        qtbot.addWidget(window)
+        _show_and_init(window, vm, qtbot)
+
+        expected = ["FS25_ModA.zip", "FS25_ModB.zip", "FS25_ModC.zip"]
+        assert sorted(cfg_svc.load("Alpha").mod_filenames) == expected
+        # Beta already listed ModA – it must not end up in there twice.
+        assert sorted(cfg_svc.load("Beta").mod_filenames) == expected
+
+    def test_new_mods_dialog_offers_only_readable_mods(self, fs, qtbot, monkeypatch) -> None:
+        """collect() moves every .zip, but an unreadable one never becomes a
+        Mod - offering it would write a filename into configs that the mod
+        lists can never show."""
+        from fsmodmanager.core.model.configuration import Configuration
+        from fsmodmanager.gui.main_window import MainWindow
+
+        (fs / "mods" / "FS25_Broken.zip").write_bytes(b"not a zip at all")
+        ConfigService(configs_dir=fs / "configs").save(
+            Configuration(name="Alpha", mod_filenames=[])
+        )
+
+        offered = []
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.NewModsAssignDialog.exec",
+            lambda self_dialog: offered.extend(m.filename for m in self_dialog._mods) or 0,
+        )
+
+        vm = _make_vm(fs)
+        window = MainWindow(view_model=vm)
+        qtbot.addWidget(window)
+        _show_and_init(window, vm, qtbot)
+
+        assert offered == ["FS25_ModA.zip", "FS25_ModB.zip", "FS25_ModC.zip"]
+
+    def test_profile_button_lists_every_installation(self, two_games, qtbot) -> None:
+        window, _vm = two_games
+        assert window._btn_profile.text() == "Spiel: FS25"
+        assert window.windowTitle() == "FS Mod Manager – FS25"
+        labels = [a.text() for a in window._profile_menu.actions() if a.text()]
+        assert labels[:2] == ["FS25", "FS22"]
+        assert "Neue Spielversion…" in labels
+
+    def test_active_profile_is_checked_in_the_menu(self, two_games, qtbot) -> None:
+        window, _vm = two_games
+        checked = [a.text() for a in window._profile_menu.actions() if a.isChecked()]
+        assert checked == ["FS25"]
+
+    def test_menu_entry_switches_the_whole_window(self, two_games, qtbot) -> None:
+        """Clicking the other installation must swap mod lists, button and
+        title together - a half-switched window is how you activate mods in
+        the wrong game."""
+        window, vm = two_games
+        assert window._available_list.list_model.rowCount() == 1
+
+        action = next(a for a in window._profile_menu.actions() if a.text() == "FS22")
+        action.trigger()
+
+        assert vm.settings.mod_collection_folder.endswith("fs22/collection")
+        assert window._btn_profile.text() == "Spiel: FS22"
+        assert window.windowTitle() == "FS Mod Manager – FS22"
+        assert window._available_list.list_model.rowCount() == 1
+        assert vm.available_mods[0].filename == "FS22_Only.zip"
+
+    def test_switch_offers_the_new_installations_new_mods(self, two_games, qtbot, monkeypatch) -> None:
+        """A profile switch runs the same startup flow as launching the app,
+        so the other game's freshly collected mods get offered too."""
+        from fsmodmanager.core.model.configuration import Configuration
+
+        window, vm = two_games
+        tmp = Path(vm.settings.savegame_path).parent
+        _make_mod_zip(tmp / "fs22/mods", "FS22_Neu.zip", "Neu in FS22")
+        ConfigService(configs_dir=tmp / "fs22/configs").save(
+            Configuration(name="FS22-Config", mod_filenames=[])
+        )
+
+        offered = []
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.NewModsAssignDialog.exec",
+            lambda self_dialog: offered.extend(m.filename for m in self_dialog._mods) or 0,
+        )
+        window._on_switch_profile("FS22")
+
+        assert offered == ["FS22_Neu.zip"]
+
+    def test_new_profile_is_added_and_switched_to(self, two_games, qtbot, monkeypatch) -> None:
+        from PySide6.QtWidgets import QDialog, QMessageBox
+
+        window, vm = two_games
+        tmp = Path(vm.settings.savegame_path).parent
+        for sub in ("fs19/mods", "fs19/collection"):
+            (tmp / sub).mkdir(parents=True)
+
+        def fill_and_accept(self_dialog):
+            self_dialog._edit_name.setText("FS19")
+            self_dialog._edit_source.setText(str(tmp / "fs19/mods"))
+            self_dialog._edit_collection.setText(str(tmp / "fs19/collection"))
+            self_dialog._edit_savegame.setText(str(tmp / "fs19"))
+            self_dialog._on_accept()
+            return QDialog.DialogCode.Accepted
+
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.ProfileEditDialog.exec", fill_and_accept
+        )
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.QMessageBox.question",
+            lambda *a, **kw: QMessageBox.StandardButton.Yes,
+        )
+
+        window._on_new_profile()
+
+        assert vm.profile_names == ["FS25", "FS22", "FS19"]
+        assert window._btn_profile.text() == "Spiel: FS19"
+
+    def test_delete_removes_the_entry_but_no_files(self, two_games, qtbot, monkeypatch) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        window, vm = two_games
+        tmp = Path(vm.settings.savegame_path).parent
+        monkeypatch.setattr(
+            "fsmodmanager.gui.main_window.QMessageBox.question",
+            lambda *a, **kw: QMessageBox.StandardButton.Yes,
+        )
+
+        window._on_delete_profile("FS22")
+
+        assert vm.profile_names == ["FS25"]
+        assert (tmp / "fs22/collection/FS22_Only.zip").exists()
+        assert [a.text() for a in window._profile_menu.actions() if a.isCheckable()] == ["FS25"]
 
     def test_settings_dialog_opens(self, fs, qtbot) -> None:
         from fsmodmanager.gui.main_window import MainWindow

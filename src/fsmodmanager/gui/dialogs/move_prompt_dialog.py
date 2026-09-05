@@ -11,12 +11,8 @@ Usage
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
-    QDialogButtonBox,
-    QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -24,8 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from fsmodmanager.core.service.collection_service import ConflictResolution, MoveConflict
-
-_DATE_FMT = "%d.%m.%Y %H:%M"
+from fsmodmanager.gui.dialogs.conflict_table import build_conflict_table
 
 
 class MovePromptDialog(QDialog):
@@ -59,39 +54,17 @@ class MovePromptDialog(QDialog):
         root.addWidget(headline)
 
         # ── comparison table ──────────────────────────────────────────────────
-        root.addWidget(self._build_table())
+        root.addWidget(
+            build_conflict_table(
+                self._conflict, "Neu (Mod-Ordner)", "Vorhanden (Sammelordner)"
+            )
+        )
 
         # ── question ──────────────────────────────────────────────────────────
         root.addWidget(QLabel("Was soll mit der neuen Datei passieren?"))
 
         # ── buttons ───────────────────────────────────────────────────────────
         root.addLayout(self._build_buttons())
-
-    def _build_table(self) -> QFrame:
-        frame = QFrame()
-        frame.setFrameShape(QFrame.Shape.StyledPanel)
-        grid = QGridLayout(frame)
-        grid.setSpacing(8)
-
-        c = self._conflict
-        headers = ["", "Neu (Mod-Ordner)", "Vorhanden (Sammelordner)"]
-        rows = [
-            ("Version", c.source_version or "unbekannt", c.target_version or "unbekannt"),
-            ("Größe", f"{c.source_size:,} Bytes", f"{c.target_size:,} Bytes"),
-            ("Geändert", c.source_modified.strftime(_DATE_FMT), c.target_modified.strftime(_DATE_FMT)),
-        ]
-
-        for col, text in enumerate(headers):
-            lbl = QLabel(f"<b>{text}</b>")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            grid.addWidget(lbl, 0, col)
-
-        for row_idx, (label, source_val, target_val) in enumerate(rows, start=1):
-            grid.addWidget(QLabel(label), row_idx, 0)
-            grid.addWidget(QLabel(source_val), row_idx, 1, Qt.AlignmentFlag.AlignCenter)
-            grid.addWidget(QLabel(target_val), row_idx, 2, Qt.AlignmentFlag.AlignCenter)
-
-        return frame
 
     def _build_buttons(self) -> QHBoxLayout:
         bar = QHBoxLayout()
